@@ -1,7 +1,7 @@
 # Emission-dashboard
 Global Emissioning monitoring dashboard From different Industries and Sectors.
 A professional emissions monitoring dashboard with AI-powered insights and interactive data visualizations.
-1) Features
+## 1) Features
 
 ### Interactive Data Visualization
 - **Year Selector**: Compare emissions across 2021-2025
@@ -21,7 +21,7 @@ A professional emissions monitoring dashboard with AI-powered insights and inter
 - Detailed data tables with filtering
 - Responsive design for all devices
 
-2) Technology Stack
+## 2) Technology Stack
 
 | Component | Technology |
 |-----------|-----------|
@@ -32,7 +32,7 @@ A professional emissions monitoring dashboard with AI-powered insights and inter
 | Language | Python 3.9+ |
 | Deployment | Streamlit Cloud |
 
-3) Data Coverage
+## 3) Data Coverage
 
 ### Sectors Tracked
 - Energy Production (Coal, Natural Gas, Oil)
@@ -53,7 +53,7 @@ A professional emissions monitoring dashboard with AI-powered insights and inter
 ### Time Period
 2021 - 2025 (Annual data with year-over-year comparisons)
 
-4) Usage Guide
+## 4) Usage Guide
 
 ### Selecting a Year
 Use the dropdown selector in the top-right to view data for any year from 2021-2025. All charts and metrics update automatically.
@@ -72,7 +72,7 @@ Use the dropdown selector in the top-right to view data for any year from 2021-2
 - **Per Capita**: Average emissions per person globally
 - **Target Gap**: Difference from 2030 climate goals
 
-5) Key Insights
+## 5) Key Insights
 
 - Global emissions increased 8.2% from 2021 to 2025
 - Energy production remains the largest source (35-36% of total)

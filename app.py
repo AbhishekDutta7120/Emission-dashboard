@@ -427,27 +427,42 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Chat input
-if prompt := st.chat_input("Ask about emissions data or search the web..."):
-    # Add user message
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-    
-    # Generate response
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            analysis = analyze_query(prompt, selected_year, current_year_data, total_emissions)
-            
-            if analysis['type'] == 'search':
-                response = search_web(analysis['query'])
-            else:
-                response = analysis['response']
-            
-            st.markdown(response)
-    
-    # Add assistant message
-    st.session_state.messages.append({"role": "assistant", "content": response})
+# Chat Interface - Only on Dashboard
+if page == "📊 Dashboard":
+    st.subheader("💬 AI Emissions Assistant")
+    st.caption("Ask questions about the data or search for latest climate information")
+
+    # Display chat messages
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Chat input
+    if prompt := st.chat_input("Ask about emissions data or search the web..."):
+        # Get current data
+        current_year = st.session_state.selected_year
+        current_data = get_sector_data(current_year)
+        total = current_data['value'].sum()
+        
+        # Add user message
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        
+        # Generate response
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                analysis = analyze_query(prompt, current_year, current_data, total)
+                
+                if analysis['type'] == 'search':
+                    response = search_web(analysis['query'])
+                else:
+                    response = analysis['response']
+                
+                st.markdown(response)
+        
+        # Add assistant message
+        st.session_state.messages.append({"role": "assistant", "content": response})
 
 # Sidebar with quick actions
 with st.sidebar:

@@ -357,6 +357,7 @@ if page == "🔧 Admin Panel":
 # MAIN DASHBOARD
 else:
     selected_year = st.selectbox("Year", ['2025', '2024', '2023', '2022', '2021'], key='year_selector')
+    st.session_state.selected_year = selected_year
     col1, col2 = st.columns([3, 1])
     with col1:
         st.markdown("### 🌍 Emissions Monitor")
@@ -487,7 +488,7 @@ with st.sidebar:
     
     st.caption("📊 Data updated: December 2025")
     st.caption("🔍 Web search powered by Claude")
-    st.caption(f"📅 Currently viewing: {selected_year}")
+    st.caption(f"📅 Currently viewing: {st.session_state.selected_year}")
     
     if st.button("🗑️ Clear Chat History", use_container_width=True):
         st.session_state.messages = []

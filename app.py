@@ -419,8 +419,8 @@ else:
     st.divider()
 
 # Chat Interface
-st.subheader("💬 AI Emissions Assistant")
-st.caption("Ask questions about the data or search for latest climate information")
+#st.subheader("💬 AI Emissions Assistant")
+#st.caption("Ask questions about the data or search for latest climate information")
 
 # Display chat messages
 for message in st.session_state.messages:

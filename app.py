@@ -453,36 +453,43 @@ if prompt := st.chat_input("Ask about emissions data or search the web..."):
 with st.sidebar:
     st.header("Quick Questions")
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("🔍 Highest emitter?", use_container_width=True):
-            prompt = "Which sector emits the most?"
+    # Only show if on dashboard page
+    if page == "📊 Dashboard":
+        col1, col2 = st.columns(2)
+        
+        # Get current data safely
+        current_year = st.session_state.selected_year
+        current_data = get_sector_data(current_year)
+        total = current_data['value'].sum()
+        
+        with col1:
+            if st.button("🔍 Highest emitter?", use_container_width=True):
+                prompt = "Which sector emits the most?"
+                st.session_state.messages.append({"role": "user", "content": prompt})
+                analysis = analyze_query(prompt, current_year, current_data, total)
+                st.session_state.messages.append({"role": "assistant", "content": analysis['response']})
+                st.rerun()
+        
+        with col2:
+            if st.button("📈 Show trend", use_container_width=True):
+                prompt = "Show me the emissions trend"
+                st.session_state.messages.append({"role": "user", "content": prompt})
+                analysis = analyze_query(prompt, current_year, current_data, total)
+                st.session_state.messages.append({"role": "assistant", "content": analysis['response']})
+                st.rerun()
+        
+        if st.button("🌍 Regional breakdown", use_container_width=True):
+            prompt = "Tell me about regional emissions"
             st.session_state.messages.append({"role": "user", "content": prompt})
-            analysis = analyze_query(prompt, selected_year, current_year_data, total_emissions)
+            analysis = analyze_query(prompt, current_year, current_data, total)
             st.session_state.messages.append({"role": "assistant", "content": analysis['response']})
             st.rerun()
-    
-    with col2:
-        if st.button("📈 Show trend", use_container_width=True):
-            prompt = "Show me the emissions trend"
+        
+        if st.button("📰 Latest climate news", use_container_width=True):
+            prompt = "What's the latest climate news?"
             st.session_state.messages.append({"role": "user", "content": prompt})
-            analysis = analyze_query(prompt, selected_year, current_year_data, total_emissions)
-            st.session_state.messages.append({"role": "assistant", "content": analysis['response']})
+            st.session_state.messages.append({"role": "assistant", "content": "Searching the web for latest climate news..."})
             st.rerun()
-    
-    if st.button("🌍 Regional breakdown", use_container_width=True):
-        prompt = "Tell me about regional emissions"
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        analysis = analyze_query(prompt, selected_year, current_year_data, total_emissions)
-        st.session_state.messages.append({"role": "assistant", "content": analysis['response']})
-        st.rerun()
-    
-    if st.button("📰 Latest climate news", use_container_width=True):
-        prompt = "What's the latest climate news?"
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        st.session_state.messages.append({"role": "assistant", "content": "Searching the web for latest climate news..."})
-        st.rerun()
     
     st.divider()
     

@@ -356,12 +356,13 @@ if page == "🔧 Admin Panel":
 
 # MAIN DASHBOARD
 else:
+    selected_year = st.selectbox("Year", ['2025', '2024', '2023', '2022', '2021'], key='year_selector')
     col1, col2 = st.columns([3, 1])
     with col1:
         st.markdown("### 🌍 Emissions Monitor")
         st.caption("Real-time monitoring & AI-powered insights • Database-powered")
     with col2:
-        selected_year = st.selectbox("Year", ['2025', '2024', '2023', '2022', '2021'], key='year_selector')
+        st.write("")
 
     st.divider()
 

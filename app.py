@@ -8,7 +8,7 @@ from database import (
     get_regional_data, update_sector_emission, add_sector_emission,
     delete_sector_emission, update_regional_data, DB_PATH
 )
-from ai_assistant import analyze_query, search_web
+from ai_assistant import process_chat_query
 
 st.set_page_config(page_title="Emissions Monitor", page_icon="🌍", layout="wide", initial_sidebar_state="collapsed")
 
@@ -278,13 +278,7 @@ if page == "📊 Dashboard":
         # Generate response
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
-                analysis = analyze_query(prompt, current_year, current_data, total)
-                
-                if analysis['type'] == 'search':
-                    response = search_web(analysis['query'])
-                else:
-                    response = analysis['response']
-                
+                response = process_chat_query(st.session_state.messages, current_year, current_data, total)
                 st.markdown(response)
         
         # Add assistant message
@@ -303,34 +297,26 @@ with st.sidebar:
         current_data = get_sector_data(current_year)
         total = current_data['value'].sum()
         
+        def handle_quick_question(prompt_text):
+            st.session_state.messages.append({"role": "user", "content": prompt_text})
+            with st.spinner("Thinking..."):
+                response = process_chat_query(st.session_state.messages, current_year, current_data, total)
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            st.rerun()
+
         with col1:
             if st.button("🔍 Highest emitter?", use_container_width=True):
-                prompt = "Which sector emits the most?"
-                st.session_state.messages.append({"role": "user", "content": prompt})
-                analysis = analyze_query(prompt, current_year, current_data, total)
-                st.session_state.messages.append({"role": "assistant", "content": analysis['response']})
-                st.rerun()
+                handle_quick_question("Which sector emits the most?")
         
         with col2:
             if st.button("📈 Show trend", use_container_width=True):
-                prompt = "Show me the emissions trend"
-                st.session_state.messages.append({"role": "user", "content": prompt})
-                analysis = analyze_query(prompt, current_year, current_data, total)
-                st.session_state.messages.append({"role": "assistant", "content": analysis['response']})
-                st.rerun()
+                handle_quick_question("Show me the emissions trend")
         
         if st.button("🌍 Regional breakdown", use_container_width=True):
-            prompt = "Tell me about regional emissions"
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            analysis = analyze_query(prompt, current_year, current_data, total)
-            st.session_state.messages.append({"role": "assistant", "content": analysis['response']})
-            st.rerun()
+            handle_quick_question("Tell me about regional emissions")
         
         if st.button("📰 Latest climate news", use_container_width=True):
-            prompt = "What's the latest climate news?"
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            st.session_state.messages.append({"role": "assistant", "content": "Searching the web for latest climate news..."})
-            st.rerun()
+            handle_quick_question("What's the latest climate news?")
     
     st.divider()
     

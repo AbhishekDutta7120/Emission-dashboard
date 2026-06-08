@@ -32,7 +32,7 @@ See Dashboard:- https://emission-dashboard-cbkk4rdfwt4atv9d5kambm.streamlit.app/
 | Framework | Streamlit |
 | Visualization | Plotly |
 | Data Processing | Pandas |
-| AI Integration | Anthropic Claude API |
+| AI Integration | Google Gemini API |
 | Language | Python 3.9+ |
 | Deployment | Streamlit Cloud |
 

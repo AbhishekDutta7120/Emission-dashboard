@@ -1,11 +1,6 @@
 """
 AI Assistant for Emissions Monitor Dashboard.
-
-Key fixes vs original:
-- Proper multi-turn agentic loop so web search actually works
-- Updated model to claude-sonnet-4-6
-- Specific error types with helpful messages
-- Cleaner system prompt with precise data context
+Powered by Google Gemini (gemini-1.5-flash) — free via Google AI Studio.
 """
 
 import os
@@ -13,16 +8,15 @@ import json
 from typing import Any
 
 import streamlit as st
-import anthropic
+import google.generativeai as genai
 
 
 # ─── Helpers ───────────────────────────────────────────────────────────────
 
 def _get_api_key() -> str:
-    """Return API key from env or Streamlit secrets, or '' if absent."""
-    key = os.getenv("ANTHROPIC_API_KEY", "")
+    key = os.getenv("GEMINI_API_KEY", "")
     if not key and hasattr(st, "secrets"):
-        key = st.secrets.get("ANTHROPIC_API_KEY", "")
+        key = st.secrets.get("GEMINI_API_KEY", "")
     return key.strip()
 
 
@@ -39,36 +33,17 @@ Sector breakdown:
 === YOUR ROLE ===
 1. Answer questions about the data above with precision — always cite specific numbers.
 2. Analyse trends, compare sectors, and explain year-over-year changes.
-3. Use the web_search tool for current climate news, recent policies, or anything
-   that may have changed after your training cut-off.
+3. You have access to Google Search — use it for current climate news, recent policies,
+   or anything that may have changed recently.
 4. Be professional, objective, and science-based.
 5. Keep responses concise (3–5 sentences unless a detailed breakdown is requested).
 
 All values are in Million tonnes CO2e (Mt CO2e).  1 000 Mt = 1 Gt."""
 
 
-def _content_to_dicts(content_blocks) -> list:
-    """Convert SDK content-block objects to plain dicts for re-use in messages."""
-    result = []
-    for block in content_blocks:
-        btype = getattr(block, "type", "")
-        if btype == "text":
-            result.append({"type": "text", "text": block.text})
-        elif btype == "tool_use":
-            result.append({
-                "type": "tool_use",
-                "id": block.id,
-                "name": block.name,
-                "input": block.input,
-            })
-        # ignore other block types (tool_result, etc.)
-    return result
-
-
 # ─── Fallback (no API key) ─────────────────────────────────────────────────
 
 def _fallback(query: str, selected_year: str, current_data: Any, total: float) -> str:
-    """Rule-based fallback when no API key is configured."""
     q = query.lower()
 
     def _row(sector: str):
@@ -126,7 +101,7 @@ def _fallback(query: str, selected_year: str, current_data: Any, total: float) -
             f"{_direction(row['change'])} {abs(row['change']):.1f}% year-over-year. "
             f"Landfills and wastewater treatment are the main contributors."
         )
-    if "trend" in q or "year" in q or "history" in q or "over time" in q:
+    if "trend" in q or "history" in q or "over time" in q:
         return (
             "Global emissions have risen steadily: **36.4 Gt** (2021) → **37.5 Gt** (2022) → "
             "**38.1 Gt** (2023) → **38.9 Gt** (2024) → **39.4 Gt** (2025). "
@@ -148,7 +123,6 @@ def _fallback(query: str, selected_year: str, current_data: Any, total: float) -
             f"({largest['value'] / total * 100:.1f}% of total)."
         )
 
-    # Generic fallback — still pulls live data
     largest = current_data.loc[current_data["value"].idxmax()]
     return (
         f"In {selected_year}, global emissions totalled **{total / 1000:.2f} Gt CO₂e**. "
@@ -166,86 +140,42 @@ def process_chat_query(
     current_data: Any,
     total_emissions: float,
 ) -> str:
-    """
-    Send the conversation to Claude and return the assistant's reply.
-
-    Implements a proper multi-turn agentic loop so web_search tool calls
-    are followed up correctly instead of being silently dropped.
-    """
     api_key = _get_api_key()
     if not api_key:
         latest = messages[-1]["content"] if messages else ""
         return _fallback(latest, current_year, current_data, total_emissions)
 
-    client = anthropic.Anthropic(api_key=api_key)
-    system_prompt = _build_system_prompt(current_year, current_data, total_emissions)
-
-    # Keep the last 6 turns for context (avoid hitting token limits)
-    api_messages = [
-        {"role": m["role"], "content": m["content"]}
-        for m in messages[-6:]
-    ]
-
-    tools = [{"type": "web_search_20250305", "name": "web_search"}]
-
     try:
-        MAX_TURNS = 4  # Guard against infinite loops
-        for _turn in range(MAX_TURNS):
-            response = client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=1500,
-                system=system_prompt,
-                messages=api_messages,
-                tools=tools,
-            )
+        genai.configure(api_key=api_key)
 
-            text_blocks = [
-                b for b in response.content if getattr(b, "type", "") == "text"
-            ]
-            tool_blocks = [
-                b for b in response.content if getattr(b, "type", "") == "tool_use"
-            ]
+        system_prompt = _build_system_prompt(current_year, current_data, total_emissions)
 
-            # ── Done: model finished speaking ──
-            if response.stop_reason == "end_turn" or not tool_blocks:
-                answer = "\n".join(b.text for b in text_blocks).strip()
-                return answer or "I couldn't generate a response — please try rephrasing."
-
-            # ── Tool use: extend the conversation and iterate ──
-            if tool_blocks and response.stop_reason == "tool_use":
-                # 1. Append the assistant turn (with tool_use blocks)
-                api_messages.append({
-                    "role": "assistant",
-                    "content": _content_to_dicts(response.content),
-                })
-
-                # 2. Append a user turn acknowledging each tool_use
-                #    For the built-in web_search tool, Anthropic executes the
-                #    search server-side; we just need to return a tool_result
-                #    so the conversation can continue.
-                tool_results = [
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": "Search results retrieved.",
-                    }
-                    for block in tool_blocks
-                ]
-                api_messages.append({"role": "user", "content": tool_results})
-                continue  # Let the model process search results and respond
-
-        return (
-            "The assistant is taking too long. "
-            "Please try a more specific question."
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            system_instruction=system_prompt,
+            tools="google_search_retrieval",   # free grounded web search
         )
 
-    except anthropic.AuthenticationError:
-        return "⚠️ Invalid API key. Check your `ANTHROPIC_API_KEY` in Streamlit secrets."
-    except anthropic.RateLimitError:
-        return "⚠️ Rate limit reached. Please wait a moment and try again."
-    except anthropic.APIConnectionError:
-        return "⚠️ Connection error. Check your internet connection and try again."
-    except anthropic.APIStatusError as e:
-        return f"⚠️ API error {e.status_code}: {e.message}"
-    except Exception as e:  # noqa: BLE001
-        return f"⚠️ Unexpected error: {e}"
+        # Convert message history to Gemini format
+        # Gemini uses "model" instead of "assistant"
+        history = []
+        for m in messages[:-1]:   # all except the latest message
+            role = "model" if m["role"] == "assistant" else "user"
+            history.append({"role": role, "parts": [m["content"]]})
+
+        chat = model.start_chat(history=history)
+
+        latest = messages[-1]["content"] if messages else ""
+        response = chat.send_message(latest)
+
+        return response.text
+
+    except Exception as e:
+        err = str(e).lower()
+        if "api_key" in err or "api key" in err or "invalid" in err:
+            return "⚠️ Invalid Gemini API key. Check `GEMINI_API_KEY` in Streamlit secrets."
+        if "quota" in err or "limit" in err or "rate" in err:
+            return "⚠️ Gemini API rate limit reached. Please wait a moment and try again."
+        if "network" in err or "connect" in err:
+            return "⚠️ Connection error. Check your internet connection and try again."
+        return f"⚠️ Error: {e}"

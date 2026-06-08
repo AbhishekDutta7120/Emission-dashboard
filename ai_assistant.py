@@ -68,39 +68,93 @@ def _content_to_dicts(content_blocks) -> list:
 # ─── Fallback (no API key) ─────────────────────────────────────────────────
 
 def _fallback(query: str, selected_year: str, current_data: Any, total: float) -> str:
-    """Simple rule-based fallback when no API key is configured."""
+    """Rule-based fallback when no API key is configured."""
     q = query.lower()
 
-    if "energy" in q or "power" in q:
-        row = current_data[current_data["sector"] == "Energy Production"].iloc[0]
+    def _row(sector: str):
+        return current_data[current_data["sector"] == sector].iloc[0]
+
+    def _direction(change: float) -> str:
+        return "down" if change < 0 else "up"
+
+    if "energy" in q or "power" in q or "electricity" in q or "coal" in q:
+        row = _row("Energy Production")
         return (
-            f"[Fallback] Energy Production remains the largest source at "
-            f"{row['value']:,.0f} Mt CO2e "
+            f"Energy Production is the largest emission source in {selected_year} at "
+            f"**{row['value']:,.0f} Mt CO₂e** ({row['value'] / total * 100:.1f}% of total). "
+            f"It went {_direction(row['change'])} by {abs(row['change']):.1f}% year-over-year, "
+            f"driven by coal, natural gas, and oil consumption."
+        )
+    if "transport" in q or "vehicle" in q or "road" in q or "aviation" in q or "ship" in q:
+        row = _row("Transportation")
+        return (
+            f"Transportation emitted **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
             f"({row['value'] / total * 100:.1f}% of total), "
-            f"showing a {row['change']:+.1f}% change year-over-year."
+            f"{_direction(row['change'])} {abs(row['change']):.1f}% from the prior year. "
+            f"Road transport, aviation, and shipping are the main contributors."
         )
-    if "transport" in q:
-        row = current_data[current_data["sector"] == "Transportation"].iloc[0]
-        direction = "up" if row["change"] > 0 else "down"
+    if "build" in q or "residential" in q or "commercial" in q or "house" in q:
+        row = _row("Buildings")
+        trend = "improved" if row['change'] < 0 else "worsened"
         return (
-            f"[Fallback] Transportation reached {row['value']:,.0f} Mt CO2e, "
-            f"{direction} {abs(row['change']):.1f}% from the prior year."
+            f"Buildings emitted **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
+            f"({row['value'] / total * 100:.1f}% of total). "
+            f"This {trend} by {abs(row['change']):.1f}% vs the previous year, "
+            f"covering residential and commercial energy use for heating, cooling, and lighting."
         )
-    if "trend" in q:
-        return "[Fallback] Global emissions rose from 36.4 Gt in 2021 to 39.4 Gt in 2025, an 8.2% increase."
-    if "region" in q:
-        return "[Fallback] Asia-Pacific leads with 18,500 Mt CO2e (48.6%), driven mainly by China and India."
-    if "agriculture" in q or "farming" in q:
-        row = current_data[current_data["sector"] == "Agriculture"].iloc[0]
+    if "industry" in q or "industrial" in q or "steel" in q or "cement" in q or "manufactur" in q:
+        row = _row("Industrial Process")
         return (
-            f"[Fallback] Agriculture contributed {row['value']:,.0f} Mt CO2e "
-            f"({row['value'] / total * 100:.1f}% of total) in {selected_year}."
+            f"Industrial Processes contributed **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
+            f"({row['value'] / total * 100:.1f}% of total), "
+            f"{_direction(row['change'])} {abs(row['change']):.1f}% year-over-year. "
+            f"Steel, cement, and chemical production are the primary sources."
+        )
+    if "agriculture" in q or "farming" in q or "livestock" in q or "crop" in q or "food" in q:
+        row = _row("Agriculture")
+        return (
+            f"Agriculture emitted **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
+            f"({row['value'] / total * 100:.1f}% of total), "
+            f"{_direction(row['change'])} {abs(row['change']):.1f}% from last year. "
+            f"Livestock (methane) and crop production are the key drivers."
+        )
+    if "waste" in q or "landfill" in q or "recycl" in q:
+        row = _row("Waste")
+        return (
+            f"Waste management emitted **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
+            f"({row['value'] / total * 100:.1f}% of total), "
+            f"{_direction(row['change'])} {abs(row['change']):.1f}% year-over-year. "
+            f"Landfills and wastewater treatment are the main contributors."
+        )
+    if "trend" in q or "year" in q or "history" in q or "over time" in q:
+        return (
+            "Global emissions have risen steadily: **36.4 Gt** (2021) → **37.5 Gt** (2022) → "
+            "**38.1 Gt** (2023) → **38.9 Gt** (2024) → **39.4 Gt** (2025). "
+            "That's an 8.2% increase over five years, moving further from the Paris Agreement target."
+        )
+    if "region" in q or "country" in q or "asia" in q or "europe" in q or "america" in q or "africa" in q:
+        return (
+            "Regional breakdown: **Asia-Pacific** leads at 18,500 Mt (48.6%), "
+            "followed by **North America** 6,800 Mt (17.9%), **Europe** 4,200 Mt (11.0%), "
+            "**Middle East** 3,900 Mt (10.2%), **Latin America** 2,400 Mt (6.3%), "
+            "and **Africa** 1,500 Mt (3.9%)."
+        )
+    if "total" in q or "overall" in q or "summary" in q or "status" in q or "overview" in q:
+        largest = current_data.loc[current_data["value"].idxmax()]
+        return (
+            f"In {selected_year}, total global emissions reached **{total / 1000:.2f} Gt CO₂e** "
+            f"({total:,.0f} Mt). "
+            f"The largest source is **{largest['sector']}** at {largest['value']:,.0f} Mt "
+            f"({largest['value'] / total * 100:.1f}% of total)."
         )
 
+    # Generic fallback — still pulls live data
+    largest = current_data.loc[current_data["value"].idxmax()]
     return (
-        f"[Fallback — no API key] Viewing {selected_year}: "
-        f"{total / 1000:.1f} Gt total emissions. "
-        "Add an ANTHROPIC_API_KEY to enable the full AI assistant with web search."
+        f"In {selected_year}, global emissions totalled **{total / 1000:.2f} Gt CO₂e**. "
+        f"The biggest contributor is {largest['sector']} at {largest['value']:,.0f} Mt "
+        f"({largest['value'] / total * 100:.1f}%). "
+        f"Try asking about a specific sector — Energy, Transport, Buildings, Industry, Agriculture, or Waste."
     )
 
 

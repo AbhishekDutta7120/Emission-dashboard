@@ -1,6 +1,10 @@
 """
 AI Assistant for Emissions Monitor Dashboard.
-Powered by Google Gemini (gemini-2.0-flash) via the new google.genai SDK.
+Powered by Google Gemini (gemini-2.0-flash) via google.genai SDK.
+
+Smart search: Google Search grounding is only enabled for queries that need
+real-time info (news, policies, recent events). Data analysis questions use
+plain Gemini — saves quota, faster response.
 """
 
 import os
@@ -10,6 +14,21 @@ from typing import Any
 import streamlit as st
 from google import genai
 from google.genai import types
+
+
+# ─── Keywords that indicate real-time web search is needed ─────────────────
+
+SEARCH_KEYWORDS = {
+    "news", "latest", "recent", "today", "current", "policy", "policies",
+    "agreement", "summit", "cop", "government", "announced", "2026",
+    "update", "new study", "research", "report", "happened", "last month",
+    "this year", "breaking", "new law", "regulation", "target",
+}
+
+
+def _needs_search(query: str) -> bool:
+    q = query.lower()
+    return any(kw in q for kw in SEARCH_KEYWORDS)
 
 
 # ─── Helpers ───────────────────────────────────────────────────────────────
@@ -34,9 +53,10 @@ Sector breakdown:
 === YOUR ROLE ===
 1. Answer questions about the data above with precision — always cite specific numbers.
 2. Analyse trends, compare sectors, and explain year-over-year changes.
-3. Use Google Search for current climate news, recent policies, or anything recent.
+3. Use Google Search (when available) for current climate news, recent policies,
+   or anything that may have changed recently.
 4. Be professional, objective, and science-based.
-5. Keep responses concise (3–5 sentences unless a detailed breakdown is requested).
+5. Keep responses concise (3-5 sentences unless a detailed breakdown is requested).
 
 All values are in Million tonnes CO2e (Mt CO2e).  1 000 Mt = 1 Gt."""
 
@@ -55,37 +75,37 @@ def _fallback(query: str, selected_year: str, current_data: Any, total: float) -
     if "energy" in q or "power" in q or "electricity" in q or "coal" in q:
         row = _row("Energy Production")
         return (f"Energy Production is the largest source in {selected_year} at "
-                f"**{row['value']:,.0f} Mt CO₂e** ({row['value']/total*100:.1f}% of total), "
+                f"**{row['value']:,.0f} Mt CO\u2082e** ({row['value']/total*100:.1f}% of total), "
                 f"{_dir(row['change'])} {abs(row['change']):.1f}% year-over-year.")
     if "transport" in q or "vehicle" in q or "road" in q or "aviation" in q:
         row = _row("Transportation")
-        return (f"Transportation emitted **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
+        return (f"Transportation emitted **{row['value']:,.0f} Mt CO\u2082e** in {selected_year} "
                 f"({row['value']/total*100:.1f}% of total), "
                 f"{_dir(row['change'])} {abs(row['change']):.1f}% from the prior year.")
     if "build" in q or "residential" in q or "commercial" in q or "house" in q:
         row = _row("Buildings")
         trend = "improved" if row['change'] < 0 else "worsened"
-        return (f"Buildings emitted **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
+        return (f"Buildings emitted **{row['value']:,.0f} Mt CO\u2082e** in {selected_year} "
                 f"({row['value']/total*100:.1f}% of total). "
                 f"Emissions {trend} by {abs(row['change']):.1f}% vs the prior year.")
     if "industry" in q or "industrial" in q or "steel" in q or "cement" in q:
         row = _row("Industrial Process")
-        return (f"Industrial Processes contributed **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
+        return (f"Industrial Processes contributed **{row['value']:,.0f} Mt CO\u2082e** in {selected_year} "
                 f"({row['value']/total*100:.1f}% of total), "
                 f"{_dir(row['change'])} {abs(row['change']):.1f}% year-over-year.")
     if "agriculture" in q or "farming" in q or "livestock" in q or "crop" in q:
         row = _row("Agriculture")
-        return (f"Agriculture emitted **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
+        return (f"Agriculture emitted **{row['value']:,.0f} Mt CO\u2082e** in {selected_year} "
                 f"({row['value']/total*100:.1f}% of total), "
                 f"{_dir(row['change'])} {abs(row['change']):.1f}% from last year.")
     if "waste" in q or "landfill" in q:
         row = _row("Waste")
-        return (f"Waste emitted **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
+        return (f"Waste emitted **{row['value']:,.0f} Mt CO\u2082e** in {selected_year} "
                 f"({row['value']/total*100:.1f}% of total), "
                 f"{_dir(row['change'])} {abs(row['change']):.1f}% year-over-year.")
     if "trend" in q or "history" in q or "over time" in q:
-        return ("Global emissions: **36.4 Gt** (2021) → **37.5 Gt** (2022) → "
-                "**38.1 Gt** (2023) → **38.9 Gt** (2024) → **39.4 Gt** (2025). "
+        return ("Global emissions: **36.4 Gt** (2021) \u2192 **37.5 Gt** (2022) \u2192 "
+                "**38.1 Gt** (2023) \u2192 **38.9 Gt** (2024) \u2192 **39.4 Gt** (2025). "
                 "An 8.2% rise over five years, moving away from Paris Agreement targets.")
     if "region" in q or "asia" in q or "europe" in q or "america" in q:
         return ("Regional split: **Asia-Pacific** 18,500 Mt (48.6%), "
@@ -94,12 +114,12 @@ def _fallback(query: str, selected_year: str, current_data: Any, total: float) -
                 "**Africa** 1,500 Mt (3.9%).")
     if any(w in q for w in ["total", "overall", "summary", "status", "overview"]):
         largest = current_data.loc[current_data["value"].idxmax()]
-        return (f"In {selected_year}, total global emissions reached **{total/1000:.2f} Gt CO₂e**. "
+        return (f"In {selected_year}, total global emissions reached **{total/1000:.2f} Gt CO\u2082e**. "
                 f"Largest source: **{largest['sector']}** at {largest['value']:,.0f} Mt "
                 f"({largest['value']/total*100:.1f}%).")
 
     largest = current_data.loc[current_data["value"].idxmax()]
-    return (f"In {selected_year}, global emissions totalled **{total/1000:.2f} Gt CO₂e**. "
+    return (f"In {selected_year}, global emissions totalled **{total/1000:.2f} Gt CO\u2082e**. "
             f"Biggest contributor: {largest['sector']} at {largest['value']:,.0f} Mt. "
             "Try asking about Energy, Transport, Buildings, Industry, Agriculture, or Waste.")
 
@@ -121,8 +141,7 @@ def process_chat_query(
         client = genai.Client(api_key=api_key)
         system_prompt = _build_system_prompt(current_year, current_data, total_emissions)
 
-        # Convert history (all but last message) to Gemini Content objects
-        # Gemini uses "model" not "assistant"
+        # Convert history to Gemini format (uses "model" not "assistant")
         history = []
         for m in messages[:-1]:
             role = "model" if m["role"] == "assistant" else "user"
@@ -130,25 +149,35 @@ def process_chat_query(
                 types.Content(role=role, parts=[types.Part.from_text(m["content"])])
             )
 
-        chat = client.chats.create(
-            model="gemini-2.0-flash",
-            config=types.GenerateContentConfig(
+        latest = messages[-1]["content"] if messages else ""
+
+        # Smart search: only enable Google Search grounding for queries
+        # that actually need real-time info — saves quota for data questions
+        if _needs_search(latest):
+            config = types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 tools=[types.Tool(google_search=types.GoogleSearch())],
-            ),
+            )
+        else:
+            config = types.GenerateContentConfig(
+                system_instruction=system_prompt,
+            )
+
+        chat = client.chats.create(
+            model="gemini-2.0-flash",
+            config=config,
             history=history,
         )
 
-        latest = messages[-1]["content"] if messages else ""
         response = chat.send_message(latest)
         return response.text
 
     except Exception as e:
         err = str(e).lower()
-        if "api_key" in err or "api key" in err or "invalid" in err or "401" in err:
+        if "quota" in err or "429" in err or "rate" in err or "too_many" in err or "resource_exhausted" in err:
+            return "⚠️ Rate limit reached — free tier allows 15 requests/minute. Please wait a moment and try again."
+        if "401" in err or "api_key" in err or "api key" in err or "unauthenticated" in err:
             return "⚠️ Invalid Gemini API key. Check `GEMINI_API_KEY` in Streamlit secrets."
-        if "quota" in err or "limit" in err or "rate" in err or "429" in err:
-            return "⚠️ Gemini rate limit reached. Please wait a moment and try again."
         if "network" in err or "connect" in err:
             return "⚠️ Connection error. Check your internet connection."
         return f"⚠️ Error: {e}"

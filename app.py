@@ -345,7 +345,7 @@ with st.sidebar:
     st.divider()
     st.caption(f"📅 Viewing: {st.session_state.selected_year}")
     st.caption("📊 Data updated: December 2025")
-    st.caption("🔍 Web search: Claude AI")
+    st.caption("🔍 Web search: Gemini AI")
 
     with st.expander("ℹ️ About"):
         st.write("""
@@ -652,7 +652,7 @@ else:
 
     # ── AI Chat ────────────────────────────────────────────────────────────
     st.markdown("### 💬 AI Emissions Assistant")
-    st.caption("Ask about the data or search for the latest climate news and policies.")
+    st.caption("Ask about the data or search for the latest news.")
 
     # ── FIX: only ONE rendering loop — removed the duplicate that was
     #         outside this block in the original code ──

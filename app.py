@@ -331,14 +331,14 @@ with st.sidebar:
 
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🔍 Top sector",     use_container_width=True): _quick("Which sector emits the most?")
+            if st.button("🔍 Top sector",     width="stretch"): _quick("Which sector emits the most?")
         with col2:
-            if st.button("📈 Show trend",     use_container_width=True): _quick("Show me the emissions trend over the years.")
-        if st.button("🌍 Regional split",     use_container_width=True): _quick("Tell me about regional emissions.")
-        if st.button("📰 Latest news",        use_container_width=True): _quick("What's the latest climate news and policies?")
+            if st.button("📈 Show trend",     width="stretch"): _quick("Show me the emissions trend over the years.")
+        if st.button("🌍 Regional split",     width="stretch"): _quick("Tell me about regional emissions.")
+        if st.button("📰 Latest news",        width="stretch"): _quick("What's the latest climate news and policies?")
 
         st.divider()
-        if st.button("🗑️ Clear chat",         use_container_width=True):
+        if st.button("🗑️ Clear chat",         width="stretch"):
             st.session_state.messages = []
             st.rerun()
 
@@ -405,7 +405,7 @@ Then restart the app — the admin panel will unlock automatically.
         col_info, col_logout = st.columns([4, 1])
         with col_info:  st.success("✅ Logged in as Admin")
         with col_logout:
-            if st.button("🚪 Logout", use_container_width=True):
+            if st.button("🚪 Logout", width="stretch"):
                 st.session_state.admin_authenticated = False
                 st.rerun()
 
@@ -439,7 +439,7 @@ Then restart the app — the admin panel will unlock automatically.
                         st.error(f"❌ Validation error: {e}")
 
             st.markdown("#### Existing Records")
-            st.dataframe(all_sectors, use_container_width=True, height=350)
+            st.dataframe(all_sectors, width="stretch", height=350)
 
             st.markdown("#### Delete Record")
             del_id = st.number_input("Record ID to delete", min_value=1, value=1, key="delete_id")
@@ -454,7 +454,7 @@ Then restart the app — the admin panel will unlock automatically.
         # ── Tab 2: Regional data ──
         with tab2:
             st.subheader("Manage Regional Data")
-            st.dataframe(regional, use_container_width=True)
+            st.dataframe(regional, width="stretch")
 
             st.markdown("#### Edit a Region")
             rid          = st.selectbox("Select Region", regional["id"].tolist())
@@ -483,7 +483,7 @@ Then restart the app — the admin panel will unlock automatically.
                     all_sectors.to_csv(index=False),
                     "sector_emissions.csv",
                     "text/csv",
-                    use_container_width=True,
+                    width="stretch",
                 )
             with c2:
                 st.download_button(
@@ -491,7 +491,7 @@ Then restart the app — the admin panel will unlock automatically.
                     regional.to_csv(index=False),
                     "regional_data.csv",
                     "text/csv",
-                    use_container_width=True,
+                    width="stretch",
                 )
 
             st.divider()
@@ -563,7 +563,7 @@ else:
         fig_bar.update_layout(height=310, **_base_layout())
         fig_bar.update_xaxes(**_axis("Mt CO₂e"))
         fig_bar.update_yaxes(**_axis(showgrid=False))
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_bar, width="stretch")
 
     with col_pie:
         st.markdown('<p class="section-label">By Region</p>', unsafe_allow_html=True)
@@ -588,7 +588,7 @@ else:
                 ),
             ),
         )
-        st.plotly_chart(fig_pie, use_container_width=True)
+        st.plotly_chart(fig_pie, width="stretch")
 
     # ── Row 2: Trend  +  YoY comparison ───────────────────────────────────
     col_trend, col_yoy = st.columns([3, 2])
@@ -609,7 +609,7 @@ else:
         fig_area.update_layout(height=260, **_base_layout())
         fig_area.update_xaxes(**_axis())
         fig_area.update_yaxes(**_axis("Mt CO₂e"))
-        st.plotly_chart(fig_area, use_container_width=True)
+        st.plotly_chart(fig_area, width="stretch")
 
     with col_yoy:
         st.markdown('<p class="section-label">Year-over-Year Sector Change (%)</p>', unsafe_allow_html=True)
@@ -628,7 +628,7 @@ else:
         fig_yoy.update_layout(height=260, **_base_layout())
         fig_yoy.update_xaxes(**_axis("YoY Change (%)"))
         fig_yoy.update_yaxes(**_axis(showgrid=False))
-        st.plotly_chart(fig_yoy, use_container_width=True)
+        st.plotly_chart(fig_yoy, width="stretch")
 
     # ── Sector detail table ────────────────────────────────────────────────
     st.markdown('<p class="section-label">Sector Details</p>', unsafe_allow_html=True)
@@ -643,7 +643,7 @@ else:
         tbl[["sector", "Emissions (Mt CO₂e)", "% of Total", "YoY Change", "subsectors"]].rename(
             columns={"sector": "Sector", "subsectors": "Key Subsectors"}
         ),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         height=260,
     )

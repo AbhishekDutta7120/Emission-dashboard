@@ -1,6 +1,6 @@
 """
 AI Assistant for Emissions Monitor Dashboard.
-Powered by Google Gemini (gemini-1.5-flash) — free via Google AI Studio.
+Powered by Google Gemini (gemini-2.0-flash) via the new google.genai SDK.
 """
 
 import os
@@ -8,7 +8,8 @@ import json
 from typing import Any
 
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 
 # ─── Helpers ───────────────────────────────────────────────────────────────
@@ -33,8 +34,7 @@ Sector breakdown:
 === YOUR ROLE ===
 1. Answer questions about the data above with precision — always cite specific numbers.
 2. Analyse trends, compare sectors, and explain year-over-year changes.
-3. You have access to Google Search — use it for current climate news, recent policies,
-   or anything that may have changed recently.
+3. Use Google Search for current climate news, recent policies, or anything recent.
 4. Be professional, objective, and science-based.
 5. Keep responses concise (3–5 sentences unless a detailed breakdown is requested).
 
@@ -46,90 +46,62 @@ All values are in Million tonnes CO2e (Mt CO2e).  1 000 Mt = 1 Gt."""
 def _fallback(query: str, selected_year: str, current_data: Any, total: float) -> str:
     q = query.lower()
 
-    def _row(sector: str):
+    def _row(sector):
         return current_data[current_data["sector"] == sector].iloc[0]
 
-    def _direction(change: float) -> str:
+    def _dir(change):
         return "down" if change < 0 else "up"
 
     if "energy" in q or "power" in q or "electricity" in q or "coal" in q:
         row = _row("Energy Production")
-        return (
-            f"Energy Production is the largest emission source in {selected_year} at "
-            f"**{row['value']:,.0f} Mt CO₂e** ({row['value'] / total * 100:.1f}% of total). "
-            f"It went {_direction(row['change'])} by {abs(row['change']):.1f}% year-over-year, "
-            f"driven by coal, natural gas, and oil consumption."
-        )
-    if "transport" in q or "vehicle" in q or "road" in q or "aviation" in q or "ship" in q:
+        return (f"Energy Production is the largest source in {selected_year} at "
+                f"**{row['value']:,.0f} Mt CO₂e** ({row['value']/total*100:.1f}% of total), "
+                f"{_dir(row['change'])} {abs(row['change']):.1f}% year-over-year.")
+    if "transport" in q or "vehicle" in q or "road" in q or "aviation" in q:
         row = _row("Transportation")
-        return (
-            f"Transportation emitted **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
-            f"({row['value'] / total * 100:.1f}% of total), "
-            f"{_direction(row['change'])} {abs(row['change']):.1f}% from the prior year. "
-            f"Road transport, aviation, and shipping are the main contributors."
-        )
+        return (f"Transportation emitted **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
+                f"({row['value']/total*100:.1f}% of total), "
+                f"{_dir(row['change'])} {abs(row['change']):.1f}% from the prior year.")
     if "build" in q or "residential" in q or "commercial" in q or "house" in q:
         row = _row("Buildings")
         trend = "improved" if row['change'] < 0 else "worsened"
-        return (
-            f"Buildings emitted **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
-            f"({row['value'] / total * 100:.1f}% of total). "
-            f"This {trend} by {abs(row['change']):.1f}% vs the previous year, "
-            f"covering residential and commercial energy use for heating, cooling, and lighting."
-        )
-    if "industry" in q or "industrial" in q or "steel" in q or "cement" in q or "manufactur" in q:
+        return (f"Buildings emitted **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
+                f"({row['value']/total*100:.1f}% of total). "
+                f"Emissions {trend} by {abs(row['change']):.1f}% vs the prior year.")
+    if "industry" in q or "industrial" in q or "steel" in q or "cement" in q:
         row = _row("Industrial Process")
-        return (
-            f"Industrial Processes contributed **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
-            f"({row['value'] / total * 100:.1f}% of total), "
-            f"{_direction(row['change'])} {abs(row['change']):.1f}% year-over-year. "
-            f"Steel, cement, and chemical production are the primary sources."
-        )
-    if "agriculture" in q or "farming" in q or "livestock" in q or "crop" in q or "food" in q:
+        return (f"Industrial Processes contributed **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
+                f"({row['value']/total*100:.1f}% of total), "
+                f"{_dir(row['change'])} {abs(row['change']):.1f}% year-over-year.")
+    if "agriculture" in q or "farming" in q or "livestock" in q or "crop" in q:
         row = _row("Agriculture")
-        return (
-            f"Agriculture emitted **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
-            f"({row['value'] / total * 100:.1f}% of total), "
-            f"{_direction(row['change'])} {abs(row['change']):.1f}% from last year. "
-            f"Livestock (methane) and crop production are the key drivers."
-        )
-    if "waste" in q or "landfill" in q or "recycl" in q:
+        return (f"Agriculture emitted **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
+                f"({row['value']/total*100:.1f}% of total), "
+                f"{_dir(row['change'])} {abs(row['change']):.1f}% from last year.")
+    if "waste" in q or "landfill" in q:
         row = _row("Waste")
-        return (
-            f"Waste management emitted **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
-            f"({row['value'] / total * 100:.1f}% of total), "
-            f"{_direction(row['change'])} {abs(row['change']):.1f}% year-over-year. "
-            f"Landfills and wastewater treatment are the main contributors."
-        )
+        return (f"Waste emitted **{row['value']:,.0f} Mt CO₂e** in {selected_year} "
+                f"({row['value']/total*100:.1f}% of total), "
+                f"{_dir(row['change'])} {abs(row['change']):.1f}% year-over-year.")
     if "trend" in q or "history" in q or "over time" in q:
-        return (
-            "Global emissions have risen steadily: **36.4 Gt** (2021) → **37.5 Gt** (2022) → "
-            "**38.1 Gt** (2023) → **38.9 Gt** (2024) → **39.4 Gt** (2025). "
-            "That's an 8.2% increase over five years, moving further from the Paris Agreement target."
-        )
-    if "region" in q or "country" in q or "asia" in q or "europe" in q or "america" in q or "africa" in q:
-        return (
-            "Regional breakdown: **Asia-Pacific** leads at 18,500 Mt (48.6%), "
-            "followed by **North America** 6,800 Mt (17.9%), **Europe** 4,200 Mt (11.0%), "
-            "**Middle East** 3,900 Mt (10.2%), **Latin America** 2,400 Mt (6.3%), "
-            "and **Africa** 1,500 Mt (3.9%)."
-        )
-    if "total" in q or "overall" in q or "summary" in q or "status" in q or "overview" in q:
+        return ("Global emissions: **36.4 Gt** (2021) → **37.5 Gt** (2022) → "
+                "**38.1 Gt** (2023) → **38.9 Gt** (2024) → **39.4 Gt** (2025). "
+                "An 8.2% rise over five years, moving away from Paris Agreement targets.")
+    if "region" in q or "asia" in q or "europe" in q or "america" in q:
+        return ("Regional split: **Asia-Pacific** 18,500 Mt (48.6%), "
+                "**North America** 6,800 Mt (17.9%), **Europe** 4,200 Mt (11.0%), "
+                "**Middle East** 3,900 Mt (10.2%), **Latin America** 2,400 Mt (6.3%), "
+                "**Africa** 1,500 Mt (3.9%).")
+    if any(w in q for w in ["total", "overall", "summary", "status", "overview"]):
         largest = current_data.loc[current_data["value"].idxmax()]
-        return (
-            f"In {selected_year}, total global emissions reached **{total / 1000:.2f} Gt CO₂e** "
-            f"({total:,.0f} Mt). "
-            f"The largest source is **{largest['sector']}** at {largest['value']:,.0f} Mt "
-            f"({largest['value'] / total * 100:.1f}% of total)."
-        )
+        return (f"In {selected_year}, total global emissions reached **{total/1000:.2f} Gt CO₂e**. "
+                f"Largest source: **{largest['sector']}** at {largest['value']:,.0f} Mt "
+                f"({largest['value']/total*100:.1f}%).")
 
     largest = current_data.loc[current_data["value"].idxmax()]
-    return (
-        f"In {selected_year}, global emissions totalled **{total / 1000:.2f} Gt CO₂e**. "
-        f"The biggest contributor is {largest['sector']} at {largest['value']:,.0f} Mt "
-        f"({largest['value'] / total * 100:.1f}%). "
-        f"Try asking about a specific sector — Energy, Transport, Buildings, Industry, Agriculture, or Waste."
-    )
+    return (f"In {selected_year}, global emissions totalled **{total/1000:.2f} Gt CO₂e**. "
+            f"Biggest contributor: {largest['sector']} at {largest['value']:,.0f} Mt. "
+            "Try asking about Energy, Transport, Buildings, Industry, Agriculture, or Waste.")
 
 
 # ─── Main entry point ──────────────────────────────────────────────────────
@@ -146,36 +118,37 @@ def process_chat_query(
         return _fallback(latest, current_year, current_data, total_emissions)
 
     try:
-        genai.configure(api_key=api_key)
-
+        client = genai.Client(api_key=api_key)
         system_prompt = _build_system_prompt(current_year, current_data, total_emissions)
 
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            system_instruction=system_prompt,
-            tools="google_search_retrieval",   # free grounded web search
-        )
-
-        # Convert message history to Gemini format
-        # Gemini uses "model" instead of "assistant"
+        # Convert history (all but last message) to Gemini Content objects
+        # Gemini uses "model" not "assistant"
         history = []
-        for m in messages[:-1]:   # all except the latest message
+        for m in messages[:-1]:
             role = "model" if m["role"] == "assistant" else "user"
-            history.append({"role": role, "parts": [m["content"]]})
+            history.append(
+                types.Content(role=role, parts=[types.Part.from_text(m["content"])])
+            )
 
-        chat = model.start_chat(history=history)
+        chat = client.chats.create(
+            model="gemini-2.0-flash",
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                tools=[types.Tool(google_search=types.GoogleSearch())],
+            ),
+            history=history,
+        )
 
         latest = messages[-1]["content"] if messages else ""
         response = chat.send_message(latest)
-
         return response.text
 
     except Exception as e:
         err = str(e).lower()
-        if "api_key" in err or "api key" in err or "invalid" in err:
+        if "api_key" in err or "api key" in err or "invalid" in err or "401" in err:
             return "⚠️ Invalid Gemini API key. Check `GEMINI_API_KEY` in Streamlit secrets."
-        if "quota" in err or "limit" in err or "rate" in err:
-            return "⚠️ Gemini API rate limit reached. Please wait a moment and try again."
+        if "quota" in err or "limit" in err or "rate" in err or "429" in err:
+            return "⚠️ Gemini rate limit reached. Please wait a moment and try again."
         if "network" in err or "connect" in err:
-            return "⚠️ Connection error. Check your internet connection and try again."
+            return "⚠️ Connection error. Check your internet connection."
         return f"⚠️ Error: {e}"

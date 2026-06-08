@@ -290,7 +290,10 @@ if "selected_year"       not in st.session_state:  st.session_state.selected_yea
 # setup guide instead of a login form, so the app is never "accidentally"
 # accessible via a known default password.
 
-ADMIN_HASH: str | None = st.secrets.get("ADMIN_PASSWORD_HASH") or None
+try:
+    ADMIN_HASH: str | None = st.secrets.get("ADMIN_PASSWORD_HASH") or None
+except Exception:
+    ADMIN_HASH = None
 
 init_database()
 
